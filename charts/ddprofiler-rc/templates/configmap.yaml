@@ -1,0 +1,24 @@
+{{- if hasKey .Values "configMaps" }}
+{{ range $key, $value := .Values.configMaps }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Release.Name }}-{{ $key }}
+  {{- if hasKey . "annotations" }}
+  annotations:
+{{ toYaml .annotations | indent 4 }}
+  {{- end }}
+data:
+  {{- if hasKey . "vars" }}
+  {{- range $key, $value := .vars }}
+  {{ $key }}: {{ tpl $value $ | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if hasKey . "secrets" }}
+  {{- range $key, $value := .secrets }}
+  {{ $key }}: {{ $value }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -1,4 +1,5 @@
 import concurrent.futures
+import time
 from ProfilerKubeRC.KubeConfigMap import KubeConfigMap
 from ProfilerKubeRC.KubeDeployment import AKubeDeployment, KubeDeploymentWithClone, DeploymentConfigDto
 from ProfilerKubeRC.KubeEventListener import KubeDeploymentEventListener, KubeCmEventListener
@@ -15,10 +16,11 @@ class ServiceInit(KubeEventHandlerInterface):
     def __init__(self, crd_name, crd_namespace):
         self._setLogger()
         crdConfig = KubeCrd(crd_name, crd_namespace)
-        config = crdConfig.getInitConfigCrd()
-        if config is None:
-            self._logger.error("No crd %s found in namespace %s" % (crd_name, crd_namespace))
-            return
+        config = None
+        while config is None:
+            self._logger.info("Waiting for crd %s in namespace %s" % (crd_name, crd_namespace))
+            time.sleep(10)
+            config = crdConfig.getInitConfigCrd()
         ServiceInit.configuraton_tag = config["cmConfigTag"]
         self._configmap = KubeConfigMap(config["cmName"], config["cmNamespace"])
         self._logger.debug("Start service initialization")
