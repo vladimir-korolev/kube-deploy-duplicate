@@ -22,13 +22,18 @@ class KubeEventListenerInterface(ABC):
     def addEventHandler(self, handler):
         pass
 
-
+# The interface for interacting with listener
+# - eventHandler: This method should be called from listener as a callback call
+# - update: to do steps to update object's configuration
 class KubeEventHandlerInterface(ABC):
 
     @abstractmethod
     def eventHandler(self, event):
         pass
 
+    @abstractmethod
+    def update(self):
+        pass
 
 class AKubeEventListener(ABC):
 

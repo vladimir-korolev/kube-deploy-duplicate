@@ -1,25 +1,29 @@
 import concurrent.futures
 import time
+from dependency_injector.wiring import inject, Provide
 from ProfilerKubeRC.KubeConfigMap import KubeConfigMap
 from ProfilerKubeRC.KubeDeployment import AKubeDeployment, KubeDeploymentWithClone, DeploymentConfigDto
 from ProfilerKubeRC.KubeEventListener import KubeDeploymentEventListener, KubeCmEventListener
 from ProfilerKubeRC.KubeEventListener import KubeEventListenerInterface, KubeEventHandlerInterface
 from ProfilerKubeRC.KubeCrd import KubeCrd
 from ProfilerKubeRC.logger import LoggerContainer
-from dependency_injector.wiring import inject, Provide
 from ProfilerKubeRC.logger import SLogger
+from ProfilerKubeRC.TasksManager import TasksManager
+from ProfilerKubeRC.container import TasksContainer
+# from ProfilerKubeRC.healthcheck import HealthCheck
 
 
-class ServiceInit(KubeEventHandlerInterface):
+class ServiceInit:
     configuraton_tag = 'config'
 
     def __init__(self, crd_name, crd_namespace):
         self._setLogger()
+        self._setTasksManager()
         crdConfig = KubeCrd(crd_name, crd_namespace)
         config = None
         while config is None:
             self._logger.info("Waiting for crd %s in namespace %s" % (crd_name, crd_namespace))
-            time.sleep(10)
+            time.sleep(1)
             config = crdConfig.getInitConfigCrd()
         ServiceInit.configuraton_tag = config["cmConfigTag"]
         self._configmap = KubeConfigMap(config["cmName"], config["cmNamespace"])
@@ -38,6 +42,11 @@ class ServiceInit(KubeEventHandlerInterface):
     def _setLogger(self, logger: SLogger = Provide[LoggerContainer.logger_svc]):
         self._logger = logger
 
+    @inject
+    def _setTasksManager(self, tasks_manager: TasksManager = Provide[TasksContainer.tasks_manager]):
+        self._tasks_manager = tasks_manager
+
+
     def runInit(self):
         for ns, ns_config in self._config.items():
             kube_event_listener = KubeDeploymentEventListener(ns)
@@ -48,7 +57,8 @@ class ServiceInit(KubeEventHandlerInterface):
                         namespace=ns,
                         name_suffix=deployment_value.get('name_suffix', '0'),
                         cloned_factor=deployment_value.get('scale_factor', '0'),
-                        image=deployment_value.get('image', None)
+                        image=deployment_value.get('cloned_image', None),
+                        env=deployment_value.get('env', None)
                     )
                     self._kube_deployments.append(kube_deployment)
                     kube_event_listener.addEventHandler(kube_deployment)
@@ -58,21 +68,21 @@ class ServiceInit(KubeEventHandlerInterface):
             self._kube_event_listeners.append(kube_event_listener)
             self._kube_cm_listener = KubeCmEventListener(self._configmap.getNamespace())
             self._kube_cm_listener.addEventHandler(self)
+            self.runListeners()
         self._logger.info("Services have been initialized")
 
     def runListeners(self):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            for listener in self._kube_event_listeners:
-                executor.submit(listener.runWatcher)
-            executor.submit(self._kube_cm_listener.runWatcher)
-        self._logger.info("Listeners have been initialized")
+        for listener in self._kube_event_listeners:
+            self._tasks_manager.addTask(listener.runWatcher, ())
+        self._tasks_manager.addTask(self._kube_cm_listener.runWatcher, ())
+
 
     def _updKubeDeployments(self, change_list: [DeploymentConfigDto]):
         for item in change_list:
             self._logger.info("Config has been changed for deploy %s" % item.name)
             for deployment in self._kube_deployments:
                 if deployment.getName() == item.name:
-                    deployment.updateDeploymentConfig(item)
+                    deployment.updateClonedDeploymentConfig(item)
 
     def eventHandler(self, event):
         if event['object'].kind == 'ConfigMap' and event['object'].metadata.name == self._configmap.getName() and event['type'] == 'MODIFIED':
@@ -80,4 +90,9 @@ class ServiceInit(KubeEventHandlerInterface):
             self._configmap.refresh()
             self._updKubeDeployments(self._configmap.diffConfig(old_config, ServiceInit.configuraton_tag))
 
+    def healthCheck(self):
+        health = True
+        for deployment in self._kube_deployments:
+            health = health & deployment.healthCheck()
+        return health
 

@@ -27,8 +27,8 @@ initConfig:
   clientType: incluster
   eksCluster:  staging-app1
   crdName: ddprof-config
-  crdNamespace: default
-  logLevel: DEBUG
+  crdNamespace: test
+  logLevel: INFO
 
 serviceAccount:
   create: true
@@ -38,13 +38,17 @@ serviceAccount:
 roles:
   - role: ddprofiler-sa
     namespace:
-      default:
+      abc:
         rules:
           read_write:
             apiGroups: '["", extensions, apps, crds.grove]'
             resources: '[pods, events, configmaps, deployments, deployments/extensions, deployments/scale, crds, ddprofcrds]'
             verbs: '[get, watch, list, update, create, patch, delete]'
 
+roles_permissions:
+  apiGroups: '["", extensions, apps, crds.grove]'
+  resources: '[pods, events, configmaps, deployments, deployments/extensions, deployments/scale, crds, ddprofcrds]'
+  verbs: '[get, watch, list, update, create, patch, delete]'
 
 podSecurityContext: {}
   # fsGroup: 2000

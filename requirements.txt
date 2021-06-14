@@ -7,3 +7,6 @@ kubernetes==12.0.1
 eks_token==0.1.1
 dependency_injector==4.32.0
 asyncio==3.4.3
+deepdiff==5.5.0
+dictdiffer==0.8.1
+nested_diff

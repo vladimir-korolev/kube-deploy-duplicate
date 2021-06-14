@@ -62,6 +62,8 @@ Create the name of the service account to use
 {{- end -}}
 {{- end -}}
 
+
+
 {{/*
 Creates all roles
 */}}
@@ -102,4 +104,16 @@ roleRef:
   name: {{ $.role }}
   apiGroup: rbac.authorization.k8s.io
   {{- end }}
+{{- end -}}
+
+
+{{/*
+Creates all role permissions
+*/}}
+{{- define "roles_permissions" }}
+    {{- range $key, $value := .roles_permissions }}
+- apiGroups: {{ $value.apiGroups }}
+  resources: {{ $value.resources }}
+  verbs: {{ $value.verbs }}
+    {{- end }}
 {{- end -}}

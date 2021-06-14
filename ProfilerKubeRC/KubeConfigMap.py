@@ -5,18 +5,11 @@ from ProfilerKubeRC import KubeEngine
 from ProfilerKubeRC.KubeDeployment import DeploymentConfigDto
 from ProfilerKubeRC.container import EngineContainer
 from ProfilerKubeRC.logger import LoggerContainer, SLogger
+from ProfilerKubeRC.KubeEventListener import KubeEventHandlerInterface
+from ProfilerKubeRC.KubeObjBaseInterface import KubeObjBaseInterface
 
 
-class AKubeConfigMap(ABC):
-    @abstractmethod
-    def getConfigurationData(self):
-        pass
-
-    @abstractmethod
-    def update(self, event):
-        pass
-
-class KubeConfigMap(AKubeConfigMap):
+class KubeConfigMap(KubeEventHandlerInterface):
     def __init__(self, name, namespace, type='yaml'):
         self._setLogger()
         self._setKubeEngine()

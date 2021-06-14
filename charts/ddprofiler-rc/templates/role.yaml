@@ -1,3 +1,0 @@
-{{- range $key, $value := .Values.roles }}
-{{- template "roles" . }}
-{{- end }}

@@ -89,12 +89,8 @@ class KubeEngine(AKubeEngine):
             w = watch.Watch()
             try:
                 for event in w.stream(self._api_appsv1.list_namespaced_deployment, namespace=namespace):
-                    # KubeEngine.logger.debug("Event: %s %s %s %s %s %s %s %s" % (event['type'], event['object'].metadata.name,
-                    #         event['object'].status.updated_replicas, event['object'].status.conditions[0].status,
-                    #         event['object'].status.conditions[1].status, event['object'].status.conditions[0].type,
-                    #         event['object'].status.conditions[1].type, event['object'].metadata.resource_version))
-                    if callback is not None and event['object'].status.conditions[0].status and event['object'].status.conditions[1].status:
-                        KubeEngine.logger.info("Event: %s %s" % (event['type'], event['object'].metadata.name))
+                    if callback is not None and len(event['object'].status.conditions) > 1 and event['object'].status.conditions[0].status and event['object'].status.conditions[1].status:
+                        KubeEngine.logger.debug("Event: %s %s to watch" % (event['type'], event['object'].metadata.name))
                         callback(event)
             except ApiException as e:
                 KubeEngine.logger.error("Exception when calling AppsV1Api->list_namespaced_deployment: %s\n" % e)
@@ -107,7 +103,7 @@ class KubeEngine(AKubeEngine):
             w = watch.Watch()
             try:
                 for event in w.stream(self._api_corev1.list_namespaced_config_map, namespace=namespace):
-                        KubeEngine.logger.info("Event: %s %s %s" % (event['type'], event['object'].metadata.name, event['object'].metadata.resource_version))
+                        KubeEngine.logger.debug("Event: %s %s %s to watch" % (event['type'], event['object'].metadata.name, event['object'].metadata.resource_version))
                         if callback is not None:
                             callback(event)
             except ApiException as e:

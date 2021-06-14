@@ -1,6 +1,6 @@
 # It is not neccessary for the current task
 # but this implementation allows has multiple configmap (if selector and merge configmap are implemnted)
-# and it's a best practice to use crd with kubernetes operator
+# and it's a best practice to use a crd with kubernetes operator
 
 
 from abc import ABC, abstractmethod
