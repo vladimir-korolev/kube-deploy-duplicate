@@ -1,0 +1,20 @@
+{{- if hasKey .Values "customResources" }}
+{{ range $key, $value := .Values.customResources }}
+---
+apiVersion: crds.grove/v1
+kind: {{ .kind }}
+metadata:
+  name: {{ $.Release.Name }}-{{ $.Values.initConfig.crdName }}
+  labels:
+    app: {{ $key }}
+cmName: {{ $.Release.Name }}-{{ $.Values.config.name }}
+cmNamespace: {{ $.Release.Namespace }}
+{{- if hasKey . "data" }}
+{{- range $key, $value := .data }}
+{{ $key }}: {{ $value }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+

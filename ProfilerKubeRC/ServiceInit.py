@@ -62,6 +62,7 @@ class ServiceInit:
                     )
                     self._kube_deployments.append(kube_deployment)
                     kube_event_listener.addEventHandler(kube_deployment)
+                    self._logger.info('====================================================================> Deployment %s has been added to handle' % kube_deployment.getName())
                 except Exception as e:
                     self._logger.exception(e)
             self._updKubeDeployments(self._configmap.getConfigData(ServiceInit.configuraton_tag))  # resync current running deployments with configmap

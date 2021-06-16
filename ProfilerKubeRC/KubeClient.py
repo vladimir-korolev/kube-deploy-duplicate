@@ -59,6 +59,7 @@ class KubeClient:
 
 class KubeLocalClient(KubeClient):
     """
+    Kubernetes client to work with a local cluster, f.e. minikube
     Public methods:
     - getApiClient(): returns kubernetes.client.ApiClient for executing  API request
     """
@@ -73,6 +74,7 @@ class KubeLocalClient(KubeClient):
 
 class KubeInclusterClient(KubeClient):
     """
+    Kubernetes client to run inside kubernetes pod
     Public methods:
     - getApiClient(): returns kubernetes.client.ApiClient for executing  API request
     """
@@ -88,6 +90,7 @@ class KubeInclusterClient(KubeClient):
 
 class KubeEKSClient(KubeClient):
     """
+    Kubernetes client to work with EKS under an assumed role
     Public methods:
     - getApiClient(): returns kubernetes.client.ApiClient for executing  API request
     """
@@ -98,8 +101,6 @@ class KubeEKSClient(KubeClient):
         self._cluster = KubeEKSClusterInfo(cluster_name, region_name, lag)
         self._logger.debug(self._cluster)
         self._refreshSessionToken()
-
-
 
     def getApiClient(self) -> kubernetes.client.ApiClient:
         if self._cluster.isTokenExpired():

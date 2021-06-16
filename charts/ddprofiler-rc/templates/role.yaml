@@ -1,0 +1,59 @@
+{{- if hasKey .Values "targetNameSpaces" }}
+{{- range $ind, $namespace := .Values.targetNameSpaces }}
+{{- $rolename := get $.Values.roles $namespace | default (print "ddprof-" $namespace) }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $rolename }}
+  namespace: {{ $namespace }}
+rules:
+{{- template "tpl.roles_permissions" $ }}
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ $rolename }}-binding
+  namespace: {{ $namespace }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $.Values.serviceAccount.name }}
+  apiGroup: ""
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ $rolename }}
+  apiGroup: rbac.authorization.k8s.io
+
+{{- end }}
+{{- end -}}
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: ddprofiler-role
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ddprofiler-rolebinding
+  namespace: {{ $.Release.Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $.Values.serviceAccount.name }}
+  apiGroup: ""
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: ddprofiler-role
+  apiGroup: rbac.authorization.k8s.io
+

@@ -181,6 +181,8 @@ class KubeDeploymentMetadataMixin(AKubeDeployment):
     Private methods:
         - _updateMetadataAttr: Update metadata info in the wrapped deployment object to allow to start a new deployment with this metatada
         - _clearStatusInfo: Clear actual running deployment statuses in metadata info in the wrapped deployment object to allow to start a new deployment with this metatada
+        - _getDeploymentNamePatch: get a patch body of the deployment name update to call API like kubectl patch
+        - _getDeploymentScalePatch: get a patch body of replicas count update to call API like kubectl patch
     """
 
     # Lists of fields have to be clear to allow to start a new deployment
@@ -210,6 +212,12 @@ class KubeDeploymentMetadataMixin(AKubeDeployment):
             obj = getattr(obj, item)
         setattr(obj, fieldPath[-1], value)
 
+    #
+    # to clean status fields in deployment object
+    # if we run get deployment we get deployment object with some data is unique for this deployment
+    # we have to clear these unique data to start a new deployment copy
+    # List of fields to clear in clearedFieldsFromRunningDeployment
+    #
     def _clearStatusInfo(self):
         if self._deployment is not None:
             for item in KubeDeploymentMetadataMixin.clearedFieldsFromRunningDeployment:
@@ -233,16 +241,29 @@ class KubeDeploymentMetadataMixin(AKubeDeployment):
         container_name = self._deployment.spec.template.spec.containers[0].name
         return KubeDeploymentTemplates.buildEnvPatch(container_name, item)
 
+    # get a patch body of the first container image to call API like kubectl patch
+    # get a patch body of the deployment name update call API like kubectl patch
     def _getDeploymentNamePatch(self, name):
         return KubeDeploymentTemplates.buildNamePatch(name)
 
+    # get a patch body of the first container env item to call API like kubectl patch
+    # _getDeploymentScalePatch: get a patch body of replicas count update to call API like kubectl patch
     def _getDeploymentScalePatch(self, replicas):
         return KubeDeploymentTemplates.buildScalePatch(replicas)
 
 
-
 class KubeDeploymentManager(KubeDeployment, KubeDeploymentMetadataMixin, KubeDeploymentReplicasMixin):
+    """
+    Class with actions for KubeDeployment class.
 
+    Public methods:
+        - createDeployment: Update metadata info in the wrapped deployment object to allow to start a new deployment with this metatada
+        - scaleReplica: Update metadata info in the wrapped deployment object to allow to start a new deployment with this metatada
+        - patchDeployment: Update metadata info in the wrapped deployment object to allow to start a new deployment with this metatada
+    Private methods:
+        - _updateMetadataAttr: Update metadata info in the wrapped deployment object to allow to start a new deployment with this metatada
+        - _clearStatusInfo: Clear actual running deployment statuses in metadata info in the wrapped deployment object to allow to start a new deployment with this metatada
+    """
     def createDeployment(self, deployment=None) -> AKubeDeployment:
         if deployment is not None:
             self._setDeployment(deployment)
@@ -271,6 +292,26 @@ class KubeDeploymentManager(KubeDeployment, KubeDeploymentMetadataMixin, KubeDep
 #
 
 class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
+    """
+    Manages a deployment with a cloned deployment of the KubeDeployment.
+    :param name: name of deployment
+    :param namespace: working kubernetes namespace
+    :param name_suffix: suffix for name of the cloned deployment
+    :param cloned_factor: (float) factor to calculate count of the cloned replicas = number of replicas * cloned_factor
+    :param image: (optional) the image to use in the cloned deployment, otherwise the same image as in main deployment
+    :param env: (optional) if we need to add an env item into the cloned deployment
+
+    Public methods:
+        - update: Update(patch cloned deployment)
+        - healthCheck: Test is the service working
+        - eventHandler: Handler of modify deployment events
+        - updateClonedDeploymentConfig: update if configmap is changed
+    Private methods:
+        - _buildClonedDeployment: Takes source deployment, applies configuration patches and saves as cloned deployment object
+        - _createClonedDeployment: If the cloned deployment exist, patches k8s deployment otherwise creates a new one
+        - _isUpdateConditon
+        - _cmpDeployments
+    """
 
     def __init__(self, name, namespace, name_suffix, cloned_factor, image=None, env=None):
         KubeDeployment.__init__(self, name, namespace)
@@ -282,18 +323,24 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
         self._active_deployment = None
         self._loadClonedDeployment()
 
+    # creates a cloned deployment at start
+    # TODO: merge with _createClonedDeployment method
     def _loadClonedDeployment(self):
-        self._refreshDeploymentInfo()
+        self._refreshDeploymentInfo()                                           # call Kuberhetes API and refresh the deployment's information
         if self._deployment is not None:
             self._logger.info("Load cloned deployment from  %s " % self._name)
-            cloned_image = self._cloned_image if self._cloned_image is not None else self._getDeploymentImage()  # We can use another image for the clone
-            self._cloned = KubeDeploymentManager(self._getClonedName(), self._namespace, cloned_image)
-            self._cloned._setDeployment(self._cloned.readDeployment())
+            if self._cloned is None:
+                # create a cloned deployment object the same as the main one
+                # it will be changed after configmap reading
+                # it won't be deployed immediately
+                self._cloned = KubeDeploymentManager(self._getClonedName(), self._namespace)
+            else:
+                self._cloned._setDeployment(self._cloned.readDeployment())      # read running cloned deployment object
             self.update()
         else:
             self._cloned = KubeDeploymentManager(self._getClonedName(), self._namespace)
             self._cloned._refreshDeploymentInfo()
-            if self._cloned._deployment is not None:
+            if self._cloned._deployment is not None:                                    # case if main deployment was removed
                 self._logger.warning("Resetting old cloned deployment %s " % self._cloned._name)
                 self._resetClonedDeployment()
             self._logger.warning("No deployment found %s " % self._name)
@@ -307,19 +354,25 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
     def _setClonedFactor(self, cloned_factor):
         self._cloned_factor: float = float(cloned_factor)
 
-    def _buildClonedDeployment(self):
-        self._setDeployment(self.readDeployment())
+    # Builds the cloned deployment body
+    # Reads the running deployment and apply rules from the configmap
+    def _buildClonedDeployment(self, deployment=None):
+        if deployment is None:
+            deployment = self.readDeployment()
+        self._setDeployment(deployment)
         self._cloned._setDeployment(self.getDeployment())._resetDeployment()
         self._cloned.setReplicasCount(self._getRequiredReplicaCount())
         if self._cloned_image is not None:
             self._cloned._setDeploymentImage(self._cloned_image)
         return self
 
+    # Deploys the cloned deployment
     def _createClonedDeployment(self):
-        cloned = self._cloned.getDeployment()
-        self._buildClonedDeployment()
+        cloned = self._cloned.readDeployment()
+        # if cloned is null then there is no cloned object is deployed in k8s
+        self._buildClonedDeployment(cloned)
         if cloned is None:
-            self._cloned.createDeployment()
+            self._cloned.createDeployment()         # create cloned deployment in k8s cluster
         else:
             self._cloned.patchDeployment(self._cloned.getDeployment())
         return self
@@ -332,18 +385,18 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
             self._logger.exception(e)
             return 0
 
+    # We have two conditonals as reason for updating:
+    # - the deployment was changed. We can check it by resource_version field
+    # - count of replicas of the managed deployment was changed. In this case resource_version isn't being changed
+
+    def _cmpDeployments(self, sourceDeployment, targetDeployment):
+        return sourceDeployment.metadata.resource_version == targetDeployment.metadata.resource_version if targetDeployment is not None else False
+
     def _isUpdateConditon(self):
         self._refreshDeploymentInfo()
         return self._cloned.getDeployment() is None or self._cloned.getReplicasCount() != self._getRequiredReplicaCount()
 
-    def _isRecreateCondition(self, new_config: DeploymentConfigDto):
-        if self._buildClonedName(new_config.body.get('name'),
-                                 new_config.body.get('name_suffix')) != self._cloned.getName():
-            return True
-        if self._cloned._getDeploymentImage() != new_config.body.get('cloned_image'):
-            return True
-        return False
-
+    # check conditions and run update the deployment
     def update(self):
         if not self._cmpDeployments(self.getDeployment(), self._active_deployment):             # if deployment was updated
             self._createClonedDeployment()                                                      # create/update a clone object
@@ -352,8 +405,9 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
             self._scaleClonedDeployment()
             self._active_deployment = self._getDeployment()
 
+    # Test healthcheck
     def healthCheck(self):
-        return not self._isUpdateConditon()
+        return not self._isUpdateConditon()             # If the deployment is validated, then application is running
 
     def _scaleClonedDeployment(self) -> AKubeDeployment:
         if self._cloned.getDeployment() is None:
@@ -362,22 +416,25 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
             self._createClonedDeployment()
         return self._cloned.scaleReplicas(self._getRequiredReplicaCount())
 
+    # stop all replicas fore the cloned deployment
     def _resetClonedDeployment(self):
         if self._cloned.getDeployment() is not None:
             return self._cloned.scaleReplicas(0)
 
-    # This function called when a deployment changed
+    # This function called as callback from an events' listener when a deployment changed
     def eventHandler(self, event):
+        self._logger.debug("Checking deployment %s event type=%s event name=%s" % (self._name, event['type'] == 'MODIFIED',event['object'].metadata.name))
         try:
             if event['type'] == 'MODIFIED' and event['object'].metadata.name == self._name:
+                self._logger.debug("Checking deployment %s" % self._name)
                 if self._deployment is None:
-                    self._loadClonedDeployment()
-                if self._deployment is not None:
+                    self._loadClonedDeployment()            # Create a cloned deployment
+                else:
                     self.update()
         except Exception as e:
             self._logger.exception(e)
 
-    # This function called when a configmap changed and updates this deployment according to the configmap
+    # This function called as callback from an events' listener when a configmap changed and updates this deployment according to the configmap
     # we can check clone name, clone image, patched environment variable, scale factor
     def updateClonedDeploymentConfig(self, new_config: DeploymentConfigDto):
         if new_config.name == self._name:
@@ -429,8 +486,6 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
                 patch = self._cloned._getDeploymentEnvPatch(env_var)
                 self._cloned.patchDeployment(patch)
 
-    def _cmpDeployments(self, sourceDeployment, targetDeployment):
-        return sourceDeployment.metadata.resource_version == targetDeployment.metadata.resource_version if targetDeployment is not None else False
 
 
 

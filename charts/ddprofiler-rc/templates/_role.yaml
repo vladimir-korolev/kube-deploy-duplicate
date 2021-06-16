@@ -1,0 +1,34 @@
+{{- if hasKey .Values "roles" }}
+{{- range $role, $value := .Values.roles }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $role }}
+  namespace: {{ $value.namespace }}
+rules:
+{{- template "tpl.roles_permissions" $ }}
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ $role }}-binding
+  namespace: {{ $.Release.Namespace }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $.Values.serviceAccount.name }}
+  apiGroup: rbac.authorization.k8s.io
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ $role }}
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+
+
+{{- end }}
+
+
+{{- end -}}
