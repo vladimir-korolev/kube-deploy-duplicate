@@ -1,0 +1,107 @@
+version: 2.1
+orbs:
+  ecr: circleci/aws-ecr@6.8.2
+  aws-cli: circleci/aws-cli@1.0.0
+
+jobs:
+  checkout-code:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/python:3.6.7
+    steps:
+      - restore_cache:
+          keys:
+            - v1-repo-{{ .Environment.CIRCLE_SHA1 }}-{{ .Environment.CIRCLE_BRANCH }}
+      - checkout
+      - run:
+          name: Clone common-ci-scripts
+          command: |
+            if [ -z $CI_SCRIPTS_BRANCH ]; then
+              CI_SCRIPTS_BRANCH="master"
+            fi
+            git clone git@github.com:groveco/common-ci-scripts.git --branch $CI_SCRIPTS_BRANCH ~/ci
+      - save_cache:
+          key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}-{{ .Environment.CIRCLE_BRANCH }}
+          paths:
+            - ~/repo
+      - save_cache:
+          key: v1-ci-{{ .Branch }}-{{ .Environment.CIRCLE_SHA1 }}-{{ epoch }}
+          paths:
+            - ~/ci
+
+  build-docker-image:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/python:3.6.7
+    steps:
+      - restore_cache:
+          keys:
+            - v1-repo-{{ .Environment.CIRCLE_SHA1 }}-{{ .Environment.CIRCLE_BRANCH }}
+      - restore_cache:
+          keys:
+            - v1-ci-{{ .Branch }}-{{ .Environment.CIRCLE_SHA1 }}
+      - run:
+          name: Check for change
+          command: ~/ci/check-diff
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - aws-cli/setup:
+          aws-region: AWS_REGION
+          version: "1"
+      - ecr/ecr-login
+      - run:
+          name: Build application Docker image
+          command: docker build -t img ./Dockerfile
+      - run: mkdir img
+      - run:
+          name: Save Docker image layer cache
+          command: docker save -o img/img.tar img
+      - save_cache:
+          key: v1-img-{{ .Branch }}-{{ .Environment.CIRCLE_SHA1 }}
+          paths:
+            - ~/repo/img
+
+  push-image:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/python:3.6.7
+    environment:
+      ECR_REPO: grove/core-ddprofiler-rc
+      ECR_ENDPOINT: 713544964960.dkr.ecr.us-east-1.amazonaws.com
+      ECR_IMG_TAG: 0.0.4
+    steps:
+      - restore_cache:
+          keys:
+            - v1-repo-{{ .Environment.CIRCLE_SHA1 }}-{{ .Environment.CIRCLE_BRANCH }}
+      - restore_cache:
+          keys:
+            - v1-ci-{{ .Branch }}-{{ .Environment.CIRCLE_SHA1 }}
+      - run:
+          name: Check for change
+          command: ~/ci/check-diff
+      - restore_cache:
+          keys:
+            - v1-img-{{ .Branch }}-{{ .Environment.CIRCLE_SHA1 }}
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - aws-cli/setup:
+          aws-region: AWS_REGION
+          version: "1"
+      - ecr/ecr-login
+      - run:
+          name: Import image tar
+          command: docker load --input img/img.tar
+      - deploy:
+          name: Push application Docker image
+          command: ~/ci/image-tag-push
+
+workflows:
+  mainline:
+    jobs:
+      - checkout-code
+      - build-docker-image:
+          requires:
+            - checkout-code
+      - push-image:
+          requires:
+            - build-docker-image
