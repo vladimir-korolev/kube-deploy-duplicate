@@ -1,7 +1,6 @@
 import sys, os
 
 import ProfilerKubeRC
-
 from ProfilerKubeRC.container import EngineContainer, TasksContainer
 from ProfilerKubeRC.ServiceInit import ServiceInit
 from ProfilerKubeRC.logger import LoggerContainer
@@ -22,6 +21,7 @@ from ProfilerKubeRC.runApp import startReplicationController
 logger: SLogger = Provide[LoggerContainer.logger_svc]
 
 if __name__ == '__main__':
+    # Initiate and wiring depedency injection
     logger_container = LoggerContainer()
     logger_container.config.loglevel.from_env('LOGLEVEL')
     logger_container.wire(modules=[sys.modules[__name__]])
@@ -40,4 +40,5 @@ if __name__ == '__main__':
 
     crdConfig = os.environ.get('CRD_NAME', 'profiler-deployment')
     crdNamespace = os.environ.get('CRD_NAMESPACE', 'default')
+    # Start application
     startReplicationController()

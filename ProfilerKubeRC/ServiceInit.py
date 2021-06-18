@@ -24,7 +24,7 @@ class ServiceInit:
         - eventHandler: Temporary configmap event handler. Will be moved to configmap class
 
     Private methods:
-        -
+        - _updKubeDeployments: Temporary method for updating a deployment if the configmap is changed
 
     """
     configuraton_tag = 'config'
@@ -41,8 +41,10 @@ class ServiceInit:
             time.sleep(1)
             config = crdConfig.getInitConfigCrd()
         ServiceInit.configuraton_tag = config["cmConfigTag"]
+        # Reading configuration from the configmap
         self._configmap = KubeConfigMap(config["cmName"], config["cmNamespace"])
         self._logger.debug("Start service initialization")
+        #
         self._config = self._configmap.getConfigurationValue(ServiceInit.configuraton_tag)
         if self._config is None:
             self._logger.error("No config found in the configmap")
@@ -61,8 +63,8 @@ class ServiceInit:
     def _setTasksManager(self, tasks_manager: TasksManager = Provide[TasksContainer.tasks_manager]):
         self._tasks_manager = tasks_manager
 
-
     def runInit(self):
+        # Read items "deployments" from configmap for configured namespaces
         for ns, ns_config in self._config.items():
             kube_event_listener = KubeDeploymentEventListener(ns)
             for deployment_name, deployment_value in ns_config.get('deployments', {}).items():
@@ -88,11 +90,13 @@ class ServiceInit:
         self._logger.info("Services have been initialized")
 
     def runListeners(self):
+        # Make a list of listeners to run each one in a separate thread
         for listener in self._kube_event_listeners:
             self._tasks_manager.addTask(listener.runWatcher, ())
         self._tasks_manager.addTask(self._kube_cm_listener.runWatcher, ())
 
     def _updKubeDeployments(self, change_list: [DeploymentConfigDto]):
+        # Send the new config to all cloned deployment.
         for item in change_list:
             self._logger.info("Config has been changed for deploy %s" % item.name)
             for deployment in self._kube_deployments:
@@ -100,6 +104,8 @@ class ServiceInit:
                     deployment.updateClonedDeploymentConfig(item)
 
     def eventHandler(self, event):
+        # Handle configmap change events. Should be moved to KubeConfigMap later
+        # It is here at present because of it has to have access to deployments list
         if event['object'].kind == 'ConfigMap' and event['object'].metadata.name == self._configmap.getName() and event['type'] == 'MODIFIED':
             old_config = self._configmap.getContent()
             self._configmap.refresh()

@@ -14,11 +14,13 @@ logger: SLogger = Provide[LoggerContainer.logger_svc]
 
 @inject
 def startReplicationController(tasks_manager: TasksManager = Provide[TasksContainer.tasks_manager]):
+    # Get path to CustomResourceDefinition Object
     crd_config = os.environ.get('CRD_NAME', 'profiler-deployment')
     crd_namespace = os.environ.get('CRD_NAMESPACE', 'default')
     service_init = ServiceInit(crd_config, crd_namespace)
     service_init.runInit()
     HealthCheck.init(service_init)
+    # Start listeners
     tasks_manager.runTasks()
 
 
