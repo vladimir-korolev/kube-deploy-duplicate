@@ -68,7 +68,7 @@ jobs:
     environment:
       ECR_REPO: grove/core-ddprofiler-rc
       ECR_ENDPOINT: 713544964960.dkr.ecr.us-east-1.amazonaws.com
-      ECR_IMG_TAG: 0.0.4
+      ECR_IMG_TAG: 0.0.5
     steps:
       - restore_cache:
           keys:
