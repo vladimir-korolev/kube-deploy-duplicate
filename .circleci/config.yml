@@ -51,7 +51,7 @@ jobs:
       - ecr/ecr-login
       - run:
           name: Build application Docker image
-          command: docker build -t img ./Dockerfile
+          command: docker build -t img -f ./Dockerfile .
       - run: mkdir img
       - run:
           name: Save Docker image layer cache
