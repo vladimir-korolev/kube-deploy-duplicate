@@ -101,8 +101,8 @@ To run application in kubernetes cluster we have to install helm chart:
 - add grove-harbor repository
         helm repo add --username=<> --password=<> grove-harbor https://harbor.tools.grove.co/chartrepo/library
 - modify values.yaml. You can look at comments in charts/ddprofiler-rc/values.yaml
-- install ddprofiler-rc chart from grove-harbor repository -f values.yaml
-        helm update --install grove-harbor ddprofiler-rc:0.0.3 
+- install ddprofiler-rc chart from grove-harbor repository 
+        helm update --install dprofiler-rc grove-harbor/ddprofiler-rc -f values.yaml
 This chart includes:
      - CustomResourseDefinitions object
      - Configmap object
