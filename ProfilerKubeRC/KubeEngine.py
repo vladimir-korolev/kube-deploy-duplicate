@@ -24,6 +24,18 @@ def kubapi_call(func):
     return wrapper
 
 class AKubeEngine(ABC):
+    """
+    Wrapes Kubernetes API
+
+    Public methods:
+        - readDeployment
+        - createDeployment
+        - watchDeployments
+        - patchDeployment
+
+    Private methods:
+
+    """
 
     @abstractmethod
     def readDeployment(self, name, namespace):

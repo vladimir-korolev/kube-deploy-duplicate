@@ -110,9 +110,11 @@ def assertUpdateDeployment(env_update):
         time.sleep(5)
     i = 0
     while i < 10 and getEnvValue(readDeployment(profiler_test_config['profiler_deployment']), env_update_var[0]) != env_update_var[1]:
-        print("Waiting for updating env variable in cloned %s != %s" %(getEnvValue(readDeployment(profiler_test_config['profiler_deployment']), env_update_var[0]), env_update_var[1]))
+        print("Waiting for updating env variable in cloned %s %s != %s" % (env_update_var[0], getEnvValue(readDeployment(profiler_test_config['profiler_deployment']), env_update_var[0]), env_update_var[1]))
         time.sleep(5)
         i += 1
+    if i == 10:
+        assert False, "Test environ,ent variable is FAIL %s!=$s" % (getEnvValue(readDeployment(profiler_test_config['profiler_deployment']), env_update_var[0]), env_update_var[1])
     source_deployment = readDeployment(profiler_test_config['source_deployment'])
     deployment = readDeployment(profiler_test_config['profiler_deployment'])
     assertDeploy(source_deployment, deployment)

@@ -14,14 +14,29 @@ from ProfilerKubeRC.container import TasksContainer
 
 
 class ServiceInit:
+    """
+    Start/stop/control services
+
+    Public methods:
+        - runInit: Load configuration. Prepare event listeners
+        - runListeners: Start event listeners
+        - healthCheck: Test is the application running
+        - eventHandler: Temporary configmap event handler. Will be moved to configmap class
+
+    Private methods:
+        -
+
+    """
     configuraton_tag = 'config'
 
     def __init__(self, crd_name, crd_namespace):
         self._setLogger()
         self._setTasksManager()
+        # We need a CRD to get information how to find a configmap with configuration
+        # Name and namespace of CRD have to be provided at start this application
         crdConfig = KubeCrd(crd_name, crd_namespace)
         config = None
-        while config is None:
+        while config is None:                                          # When we start the application from helm chart first time, deployment of crd will take some time
             self._logger.info("Waiting for crd %s in namespace %s" % (crd_name, crd_namespace))
             time.sleep(1)
             config = crdConfig.getInitConfigCrd()
@@ -76,7 +91,6 @@ class ServiceInit:
         for listener in self._kube_event_listeners:
             self._tasks_manager.addTask(listener.runWatcher, ())
         self._tasks_manager.addTask(self._kube_cm_listener.runWatcher, ())
-
 
     def _updKubeDeployments(self, change_list: [DeploymentConfigDto]):
         for item in change_list:

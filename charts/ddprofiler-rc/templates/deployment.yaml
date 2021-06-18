@@ -26,6 +26,17 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}"
+          ports:
+          - name: liveness-port
+            containerPort: 8324
+          livenessProbe:
+            httpGet:
+              path: /
+              port: liveness-port
+            failureThreshold: 10
+            successThreshold: 1
+            periodSeconds: 10
+            initialDelaySeconds: 60
           env:
           {{- with .Values.initConfig }}
           - name: CLIENT

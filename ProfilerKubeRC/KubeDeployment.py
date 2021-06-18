@@ -356,9 +356,8 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
 
     # Builds the cloned deployment body
     # Reads the running deployment and apply rules from the configmap
-    def _buildClonedDeployment(self, deployment=None):
-        if deployment is None:
-            deployment = self.readDeployment()
+    def _buildClonedDeployment(self):
+        deployment = self.readDeployment()
         self._setDeployment(deployment)
         self._cloned._setDeployment(self.getDeployment())._resetDeployment()
         self._cloned.setReplicasCount(self._getRequiredReplicaCount())
@@ -370,7 +369,7 @@ class KubeDeploymentWithClone(KubeDeploymentManager, KubeEventHandlerInterface):
     def _createClonedDeployment(self):
         cloned = self._cloned.readDeployment()
         # if cloned is null then there is no cloned object is deployed in k8s
-        self._buildClonedDeployment(cloned)
+        self._buildClonedDeployment()
         if cloned is None:
             self._cloned.createDeployment()         # create cloned deployment in k8s cluster
         else:

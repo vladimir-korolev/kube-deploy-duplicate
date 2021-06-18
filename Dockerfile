@@ -11,4 +11,4 @@ COPY . /usr/src/app/
 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN env
-CMD ["python", "run-container.py"]
+CMD ["python", "startApp.py"]

@@ -6,10 +6,20 @@ from ProfilerKubeRC.KubeDeployment import DeploymentConfigDto
 from ProfilerKubeRC.container import EngineContainer
 from ProfilerKubeRC.logger import LoggerContainer, SLogger
 from ProfilerKubeRC.KubeEventListener import KubeEventHandlerInterface
-from ProfilerKubeRC.KubeObjBaseInterface import KubeObjBaseInterface
-
 
 class KubeConfigMap(KubeEventHandlerInterface):
+    """
+    Handles configmap objects. At present this class uses to parse configuration from configmap object
+    :param name: name of deployment
+    :param namespace: working kubernetes namespace
+    :param type: type of configmap data
+
+    Public methods:
+        - update: Not used yet. In future it have to generate deployment event
+
+    Private methods:
+
+    """
     def __init__(self, name, namespace, type='yaml'):
         self._setLogger()
         self._setKubeEngine()
