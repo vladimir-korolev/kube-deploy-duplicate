@@ -1,20 +1,20 @@
-This kubernetes operator creates and maintains clones of the existing kubernetes deployment according to the configuration rules.
+This kubernetes operator creates and maintains clones of the existing kubernetes deployment according to configuration rules.
 It responsible for:
- - number of replicas of the cloned deployment have to comply with rules in the configuration
- - use special image for the cloned deployment
- - add extra environment variables to the cloned deployment  
+ - number of replicas of the cloned deployment have to match rules in the configuration
+ - using special image for the cloned deployment
+ - adding extra environment variables to the cloned deployment  
  
-LIMITATION:
-  - only one container is supported in source deployment
-  - if we remove an env item in a source deployment it won't be removed in cloned one because it used kubernetes patch API call to update the cloned replica 
-  - if a source deployment object has deleted, the cloned deployment object will running with replicas=0 
-  - when we start the application first time we can have error message from Kubernetes API about the deployment can't be found. Please, don't disturb about it
+LIMITATIONS:
+  - only one container is supported in the source deployment
+  - if we remove an env item in the source deployment it won't be removed in the cloned one because it used a kubernetes patch API call to update the cloned replica 
+  - if the source deployment object has been deleted, the cloned deployment object will continue to run with replicas=0 
+  - when we start the application at first we can have got error message from Kubernetes API about the deployment can't be found. Please, don't disturb about it
   
 # How to configure
 
 ##Start application
-To start application run:
-python startApp.py CLIENT=<TYPE_OF_K8S_CLUSTER>;CLUSTER=<EKS_CLUSTER_NAME>;CRD_NAME=<CRD_NAME>;CRD_NAMESPACE=<CRD_NAMESPACE>;LOGLEVEL=<LOG_LEVEL>
+To start application it needs to run:
+CLIENT=<TYPE_OF_K8S_CLUSTER> CLUSTER=<EKS_CLUSTER_NAME> CRD_NAME=<CRD_NAME> CRD_NAMESPACE=<CRD_NAMESPACE> LOGLEVEL=<LOG_LEVEL> python startApp.py 
 where:
 ```
     TYPE_OF_K8S_CLUSTER: Type of kubernetes cluster.
@@ -27,24 +27,29 @@ where:
     CRD_NAMESPACE: Namespace where the CustomResourseDefinitions object is
     LOGLEVEL: can be INFO, ERROR, WARNING, DEBUG
 ```
-CustomResourseDefinitions object and configmap object must be deployed to the cluster before starting application
+CustomResourseDefinitions object and configmap object must be deployed to the cluster before the application has been started 
     
 Examples:
-- start application with minikube
+- start the application with minikube
 ```
-python startApp.py CLIENT=local;CRD_NAME=ddprof-ddprof-rcconfig;CRD_NAMESPACE=profiler-m;LOGLEVEL=DEBUG
-```
-
-- start application with eks
-```
-python startApp.py CLIENT=eks;CLUSTER=staging_app1;CRD_NAME=ddprof-ddprof-rcconfig;CRD_NAMESPACE=profiler-m;LOGLEVEL=INFO
+CLIENT=local CRD_NAME=ddprof-ddprof-rcconfig CRD_NAMESPACE=profiler-m LOGLEVEL=DEBUG python startApp.py 
 ```
 
-- start application in kubernetes pod inside cluster. It is a production mode
+- start the application with eks
 ```
-python startApp.py CLIENT=incluster;CRD_NAME=ddprof-ddprof-rcconfig;CRD_NAMESPACE=profiler-m;LOGLEVEL=INFO
+CLIENT=eks CLUSTER=staging_app1 CRD_NAME=ddprof-ddprof-rcconfig CRD_NAMESPACE=profiler-m LOGLEVEL=INFO python startApp.py 
+```
+
+- start the application in kubernetes pod inside cluster. It is a production mode
+```
+CLIENT=incluster CRD_NAME=ddprof-ddprof-rcconfig CRD_NAMESPACE=profiler-m LOGLEVEL=INFO python startApp.py 
 ```
 Application can be deployed in separate namespace from managed deployment and we don't need provide some extra permissions to production namespace for user who should start this application  
+
+##Run demo application in minikube using a run script
+You can run minikube/start_in_minikube.sh <DOCKERREGISTRY> to deploy the demonstration in existing minikube cluster. This script will build docker image and deploy precobfigured hekm chart.
+You have to login to docker registry to push the created image and have to use your image as argument of the script.
+To run demo application in minikube in "profiler-m" namespace you need login to docker registry to pusg
 
 ##Configuration objects
 Configuration rule are in profiler-rc-config variable in a k8s configmap object. Schema of the configmap:
@@ -124,14 +129,14 @@ This application starts in separate threads:
 - event listener to watch k8s configmaps' changes
 - web service to process healthchecks 
 
-The deployments event listeners are watching k8s deployments events(like "kubectl get deployments -w"). For each event it have to be run an event handler. The event handler filters events and handles them. 
-The event handler can update a cloned deployment only not a source deployment. Event handler gets source deploy, creates the same copy, applies rules in configuration and creates a new deploy or patches the existing one. Any changes in source deployment will start update a cloned deployment.
+The deployments event listeners are watching k8s deployments events(like "kubectl get deployments -w"). Each event is handled an event handler. 
+The event handler can update a cloned deployment only not a source deployment. Event handler gets source deploy, creates the same copy, applies rules in configuration and creates a new deploy or patches the existing one. Any changes in source deployment will force update the cloned deployment.
 Because of the cloned deploy is being patched, only changes apply to it without restarting a cloned object if it isn't necessary
 
-The configmap event listener are watching k8s configmaps events(like "kubectl get configmaps -w"). For each event it have to be run an event handler. The event handler filters events and handles them.
-The event handler creates a config DTO object and run an update config method in the deployments (TODO: generate an event instead of direct call update deployment method)
+The configmap event listener are watching k8s configmaps events(like "kubectl get configmaps -w"). Each event is handled an event handler. 
+The event handler creates a config DTO object and runs an update configuration of the deployments (TODO: generate an event instead of direct call update deployment method)
 
-The web service just checks is the application works and returns HTTP 200 is OK. It just checks required number replicas of the cloned deployment
+The web service just checks does the application works and returns HTTP 200 is OK. It just checks required number replicas of the cloned deployment
 
 
 Sequence diagram

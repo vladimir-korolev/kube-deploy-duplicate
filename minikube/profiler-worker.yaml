@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: profiler-worker
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 2 # tells deployment to run 2 pods matching the template
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+        env:
+          - name: ROLE
+            value: web
+          - name: TEST
+            value: "true"
+        ports:
+        - containerPort: 80
